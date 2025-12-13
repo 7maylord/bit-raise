@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { Wallet, Zap, Heart, Gift } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useStacksContext } from "@/contexts/StacksContext";
+import { toast as sonnerToast } from "sonner";
 
 interface DonationModalProps {
   isOpen: boolean;
@@ -20,10 +24,12 @@ interface DonationModalProps {
 
 const presetAmounts = [10, 25, 50, 100, 250, 500];
 
-const DonationModal = ({ isOpen, onClose, campaignTitle }: DonationModalProps) => {
+const DonationModal = ({ isOpen, onClose, campaignTitle, campaignId }: DonationModalProps) => {
   const [amount, setAmount] = useState<string>("");
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
+  const [isPledging, setIsPledging] = useState(false);
   const { toast } = useToast();
+  const { userData, pledge } = useStacksContext();
 
   const handlePresetClick = (preset: number) => {
     setSelectedPreset(preset);
@@ -35,7 +41,7 @@ const DonationModal = ({ isOpen, onClose, campaignTitle }: DonationModalProps) =
     setSelectedPreset(null);
   };
 
-  const handleDonate = () => {
+  const handleDonate = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       toast({
         title: "Invalid amount",
@@ -45,13 +51,30 @@ const DonationModal = ({ isOpen, onClose, campaignTitle }: DonationModalProps) =
       return;
     }
 
-    toast({
-      title: "Wallet connection required",
-      description: "Please connect your Stacks wallet to complete the donation.",
-    });
-    
-    // In a real implementation, this would trigger wallet connection and transaction
-    onClose();
+    if (!userData) {
+      sonnerToast.error("Please connect your wallet first");
+      return;
+    }
+
+    setIsPledging(true);
+
+    try {
+      await pledge(Number(campaignId), parseFloat(amount));
+
+      sonnerToast.success("Pledge transaction submitted! Please wait for confirmation.");
+
+      // Reset form and close modal after a short delay
+      setTimeout(() => {
+        setAmount("");
+        setSelectedPreset(null);
+        onClose();
+      }, 2000);
+    } catch (error) {
+      console.error("Error pledging:", error);
+      sonnerToast.error(error instanceof Error ? error.message : "Failed to pledge");
+    } finally {
+      setIsPledging(false);
+    }
   };
 
   return (
@@ -121,12 +144,12 @@ const DonationModal = ({ isOpen, onClose, campaignTitle }: DonationModalProps) =
 
           {/* Action Buttons */}
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={onClose}>
+            <Button variant="outline" className="flex-1" onClick={onClose} disabled={isPledging}>
               Cancel
             </Button>
-            <Button className="flex-1" onClick={handleDonate}>
+            <Button className="flex-1" onClick={handleDonate} disabled={isPledging}>
               <Wallet className="w-4 h-4 mr-2" />
-              Donate {amount ? `${amount} STX` : ""}
+              {isPledging ? "Processing..." : `Donate ${amount ? `${amount} STX` : ""}`}
             </Button>
           </div>
 

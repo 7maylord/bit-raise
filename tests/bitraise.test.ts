@@ -392,7 +392,7 @@ describe("BitRaise Crowdfunding Platform", () => {
 
       const campaignData: any = cvToValue((result as any).value);
       expect(campaignData.state.value).toStrictEqual("successful");
-      expect(campaignData.withdrawn).toStrictEqual(true);
+      expect(campaignData.withdrawn.value).toStrictEqual(true);
     });
 
     it("should fail when non-creator tries to withdraw", () => {
@@ -573,7 +573,7 @@ describe("BitRaise Crowdfunding Platform", () => {
       );
 
       const pledgeData: any = cvToValue((result as any).value);
-      expect(pledgeData.refunded).toStrictEqual(true);
+      expect(pledgeData.refunded.value).toStrictEqual(true);
     });
 
     it("should fail when trying to refund twice", () => {
@@ -1024,6 +1024,588 @@ describe("BitRaise Crowdfunding Platform", () => {
       );
 
       expect(result).toStrictEqual(Cl.tuple({ count: Cl.uint(2) }));
+    });
+  });
+
+  // ========================================
+  // SECURITY & EDGE CASE TESTS
+  // ========================================
+
+  describe("Security: Input Validation", () => {
+    it("should reject empty title", () => {
+      const { result } = simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8(""),
+          Cl.stringUtf8("Valid description"),
+          Cl.uint(10_000_000),
+          Cl.uint(1000),
+          Cl.stringAscii("ipfs://test"),
+        ],
+        wallet1
+      );
+
+      expect(result).toBeErr(Cl.uint(104)); // ERR-INVALID-AMOUNT
+    });
+
+    it("should reject empty description", () => {
+      const { result } = simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Valid title"),
+          Cl.stringUtf8(""),
+          Cl.uint(10_000_000),
+          Cl.uint(1000),
+          Cl.stringAscii("ipfs://test"),
+        ],
+        wallet1
+      );
+
+      expect(result).toBeErr(Cl.uint(104)); // ERR-INVALID-AMOUNT
+    });
+
+    it("should reject platform fee above 10%", () => {
+      const { result } = simnet.callPublicFn(
+        "bitraise",
+        "set-platform-fee",
+        [Cl.uint(11)],
+        deployer
+      );
+
+      expect(result).toBeErr(Cl.uint(113)); // ERR-INVALID-FEE
+    });
+
+    it("should accept maximum 10% platform fee", () => {
+      const { result } = simnet.callPublicFn(
+        "bitraise",
+        "set-platform-fee",
+        [Cl.uint(10)],
+        deployer
+      );
+
+      expect(result).toBeOk(Cl.bool(true));
+    });
+  });
+
+  describe("Security: Reentrancy Protection", () => {
+    it("should prevent double refund", () => {
+      simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Reentrancy Test"),
+          Cl.stringUtf8("Testing reentrancy protection"),
+          Cl.uint(20_000_000),
+          Cl.uint(500),
+          Cl.stringAscii("ipfs://reentrancy"),
+        ],
+        wallet1
+      );
+
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(0), Cl.uint(5_000_000)],
+        wallet2
+      );
+
+      simnet.mineEmptyBlocks(501);
+
+      // First refund
+      const firstRefund = simnet.callPublicFn(
+        "bitraise",
+        "refund",
+        [Cl.uint(0)],
+        wallet2
+      );
+      expect(firstRefund.result).toBeOk(Cl.uint(5_000_000));
+
+      // Second refund attempt should fail
+      const secondRefund = simnet.callPublicFn(
+        "bitraise",
+        "refund",
+        [Cl.uint(0)],
+        wallet2
+      );
+      expect(secondRefund.result).toBeErr(Cl.uint(108)); // ERR-ALREADY-REFUNDED
+    });
+  });
+
+  describe("Edge Cases: Campaign State Updates", () => {
+    it("should update campaign state to successful when goal is reached during pledge", () => {
+      simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("State Test"),
+          Cl.stringUtf8("Testing state update on goal reach"),
+          Cl.uint(10_000_000),
+          Cl.uint(1000),
+          Cl.stringAscii("ipfs://state"),
+        ],
+        wallet1
+      );
+
+      // Pledge exactly the goal
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(0), Cl.uint(10_000_000)],
+        wallet2
+      );
+
+      // Check campaign state - should be successful before deadline
+      const { result } = simnet.callReadOnlyFn(
+        "bitraise",
+        "get-campaign",
+        [Cl.uint(0)],
+        wallet1
+      );
+
+      const campaignData: any = cvToValue((result as any).value);
+      expect(campaignData.state.value).toStrictEqual("successful");
+    });
+
+    it("should update campaign state to successful when goal is exceeded", () => {
+      simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Over Goal"),
+          Cl.stringUtf8("Testing over-funding"),
+          Cl.uint(10_000_000),
+          Cl.uint(1000),
+          Cl.stringAscii("ipfs://overgoal"),
+        ],
+        wallet1
+      );
+
+      // Pledge more than the goal
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(0), Cl.uint(15_000_000)],
+        wallet2
+      );
+
+      // Check campaign state
+      const { result } = simnet.callReadOnlyFn(
+        "bitraise",
+        "get-campaign",
+        [Cl.uint(0)],
+        wallet1
+      );
+
+      const campaignData: any = cvToValue((result as any).value);
+      expect(campaignData.state.value).toStrictEqual("successful");
+      expect(Number(campaignData["total-pledged"].value)).toBe(15000000);
+    });
+
+    it("should keep state as successful after goal is reached with multiple pledges", () => {
+      const { result: createResult } = simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Multi Pledge State"),
+          Cl.stringUtf8("Testing state with multiple pledges"),
+          Cl.uint(10_000_000),
+          Cl.uint(1000),
+          Cl.stringAscii("ipfs://multipledge"),
+        ],
+        wallet1
+      );
+      const campaignId = Number(cvToValue((createResult as any).value));
+
+      // First pledge reaches goal
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(campaignId), Cl.uint(10_000_000)],
+        wallet2
+      );
+
+      // Additional pledge
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(campaignId), Cl.uint(5_000_000)],
+        wallet3
+      );
+
+      // State should still be successful
+      const { result } = simnet.callReadOnlyFn(
+        "bitraise",
+        "get-campaign",
+        [Cl.uint(campaignId)],
+        wallet1
+      );
+
+      const campaignData: any = cvToValue((result as any).value);
+      expect(campaignData.state.value).toStrictEqual("successful");
+      expect(Number(campaignData["total-pledged"].value)).toBe(15000000);
+    });
+  });
+
+  describe("Edge Cases: Platform Fee Calculation", () => {
+    it("should handle fee calculation with odd amounts correctly", () => {
+      simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Odd Amount Fee"),
+          Cl.stringUtf8("Testing odd amount fee calculation"),
+          Cl.uint(10_000_000),
+          Cl.uint(500),
+          Cl.stringAscii("ipfs://oddfee"),
+        ],
+        wallet1
+      );
+
+      // Pledge odd amount that doesn't divide evenly (but still meets goal)
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(0), Cl.uint(10_999_999)],
+        wallet2
+      );
+
+      simnet.mineEmptyBlocks(501);
+
+      const { result } = simnet.callPublicFn(
+        "bitraise",
+        "withdraw-funds",
+        [Cl.uint(0)],
+        wallet1
+      );
+
+      // (10999999 * 2) / 100 = 219999 fee (integer division)
+      // Creator gets: 10999999 - 219999 = 10780000
+      expect(result).toBeOk(Cl.uint(10_780_000));
+    });
+
+    it("should calculate fees correctly with 0% fee", () => {
+      simnet.callPublicFn(
+        "bitraise",
+        "set-platform-fee",
+        [Cl.uint(0)],
+        deployer
+      );
+
+      simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Zero Fee"),
+          Cl.stringUtf8("Testing zero fee"),
+          Cl.uint(10_000_000),
+          Cl.uint(500),
+          Cl.stringAscii("ipfs://zerofee"),
+        ],
+        wallet1
+      );
+
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(0), Cl.uint(10_000_000)],
+        wallet2
+      );
+
+      simnet.mineEmptyBlocks(501);
+
+      const { result } = simnet.callPublicFn(
+        "bitraise",
+        "withdraw-funds",
+        [Cl.uint(0)],
+        wallet1
+      );
+
+      // Should receive full amount
+      expect(result).toBeOk(Cl.uint(10_000_000));
+    });
+
+    it("should calculate fees correctly with 10% maximum fee", () => {
+      simnet.callPublicFn(
+        "bitraise",
+        "set-platform-fee",
+        [Cl.uint(10)],
+        deployer
+      );
+
+      simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Max Fee"),
+          Cl.stringUtf8("Testing max fee"),
+          Cl.uint(10_000_000),
+          Cl.uint(500),
+          Cl.stringAscii("ipfs://maxfee"),
+        ],
+        wallet1
+      );
+
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(0), Cl.uint(10_000_000)],
+        wallet2
+      );
+
+      simnet.mineEmptyBlocks(501);
+
+      const { result } = simnet.callPublicFn(
+        "bitraise",
+        "withdraw-funds",
+        [Cl.uint(0)],
+        wallet1
+      );
+
+      // Should receive 90% of amount
+      expect(result).toBeOk(Cl.uint(9_000_000));
+    });
+
+    it("should accumulate fees from multiple campaigns correctly", () => {
+      // Campaign 1
+      simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Fee Accumulation 1"),
+          Cl.stringUtf8("First campaign"),
+          Cl.uint(10_000_000),
+          Cl.uint(500),
+          Cl.stringAscii("ipfs://acc1"),
+        ],
+        wallet1
+      );
+
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(0), Cl.uint(10_000_000)],
+        wallet2
+      );
+
+      simnet.mineEmptyBlocks(501);
+      simnet.callPublicFn("bitraise", "withdraw-funds", [Cl.uint(0)], wallet1);
+
+      // Campaign 2
+      simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Fee Accumulation 2"),
+          Cl.stringUtf8("Second campaign"),
+          Cl.uint(20_000_000),
+          Cl.uint(500),
+          Cl.stringAscii("ipfs://acc2"),
+        ],
+        wallet1
+      );
+
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(1), Cl.uint(20_000_000)],
+        wallet2
+      );
+
+      simnet.mineEmptyBlocks(501);
+      simnet.callPublicFn("bitraise", "withdraw-funds", [Cl.uint(1)], wallet1);
+
+      // Check accumulated fees: 2% of 10M + 2% of 20M = 200K + 400K = 600K
+      const { result } = simnet.callReadOnlyFn(
+        "bitraise",
+        "get-total-platform-fees",
+        [],
+        deployer
+      );
+
+      expect(result).toStrictEqual(Cl.uint(600_000));
+    });
+  });
+
+  describe("Edge Cases: Boundary Values", () => {
+    it("should handle minimum goal amount", () => {
+      const { result } = simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Min Goal"),
+          Cl.stringUtf8("Minimum goal test"),
+          Cl.uint(1_000_000), // Exactly MIN-GOAL (1 STX)
+          Cl.uint(1000),
+          Cl.stringAscii("ipfs://mingoal"),
+        ],
+        wallet1
+      );
+
+      expect(result).toBeOk(Cl.uint(0));
+    });
+
+    it("should reject goal just below minimum", () => {
+      const { result } = simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Below Min"),
+          Cl.stringUtf8("Below minimum"),
+          Cl.uint(999_999), // Just below MIN-GOAL
+          Cl.uint(1000),
+          Cl.stringAscii("ipfs://belowmin"),
+        ],
+        wallet1
+      );
+
+      expect(result).toBeErr(Cl.uint(110)); // ERR-INVALID-GOAL
+    });
+
+    it("should handle minimum duration", () => {
+      const { result } = simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Min Duration"),
+          Cl.stringUtf8("Minimum duration test"),
+          Cl.uint(10_000_000),
+          Cl.uint(144), // Exactly MIN-CAMPAIGN-DURATION (~1 day)
+          Cl.stringAscii("ipfs://mindur"),
+        ],
+        wallet1
+      );
+
+      expect(result).toBeOk(Cl.uint(0));
+    });
+
+    it("should handle maximum duration", () => {
+      const { result } = simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Max Duration"),
+          Cl.stringUtf8("Maximum duration test"),
+          Cl.uint(10_000_000),
+          Cl.uint(52560), // Exactly MAX-CAMPAIGN-DURATION (~1 year)
+          Cl.stringAscii("ipfs://maxdur"),
+        ],
+        wallet1
+      );
+
+      expect(result).toBeOk(Cl.uint(0));
+    });
+  });
+
+  describe("Security: Concurrent Operations", () => {
+    it("should handle multiple pledges from different backers correctly", () => {
+      simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Multi Backer"),
+          Cl.stringUtf8("Testing multiple backers"),
+          Cl.uint(10_000_000),
+          Cl.uint(1000),
+          Cl.stringAscii("ipfs://multibacker"),
+        ],
+        wallet1
+      );
+
+      // Multiple pledges
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(0), Cl.uint(2_000_000)],
+        wallet2
+      );
+
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(0), Cl.uint(3_000_000)],
+        wallet3
+      );
+
+      // Check totals
+      const { result } = simnet.callReadOnlyFn(
+        "bitraise",
+        "get-campaign",
+        [Cl.uint(0)],
+        wallet1
+      );
+
+      const campaignData: any = cvToValue((result as any).value);
+      expect(Number(campaignData["total-pledged"].value)).toBe(5000000);
+
+      // Check backer count
+      const backerCount = simnet.callReadOnlyFn(
+        "bitraise",
+        "get-backer-count",
+        [Cl.uint(0)],
+        wallet1
+      );
+
+      expect(backerCount.result).toStrictEqual(Cl.tuple({ count: Cl.uint(2) }));
+    });
+
+    it("should handle same backer pledging multiple times", () => {
+      simnet.callPublicFn(
+        "bitraise",
+        "create-campaign",
+        [
+          Cl.stringUtf8("Repeat Pledge"),
+          Cl.stringUtf8("Testing repeat pledges"),
+          Cl.uint(10_000_000),
+          Cl.uint(1000),
+          Cl.stringAscii("ipfs://repeat"),
+        ],
+        wallet1
+      );
+
+      // Multiple pledges from same backer
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(0), Cl.uint(1_000_000)],
+        wallet2
+      );
+
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(0), Cl.uint(2_000_000)],
+        wallet2
+      );
+
+      simnet.callPublicFn(
+        "bitraise",
+        "pledge",
+        [Cl.uint(0), Cl.uint(3_000_000)],
+        wallet2
+      );
+
+      // Check total pledge
+      const { result } = simnet.callReadOnlyFn(
+        "bitraise",
+        "get-pledge",
+        [Cl.uint(0), Cl.principal(wallet2)],
+        wallet2
+      );
+
+      const pledgeData: any = cvToValue((result as any).value);
+      expect(Number(pledgeData.amount.value)).toBe(6000000);
+
+      // Backer count should still be 1
+      const backerCount = simnet.callReadOnlyFn(
+        "bitraise",
+        "get-backer-count",
+        [Cl.uint(0)],
+        wallet1
+      );
+
+      expect(backerCount.result).toStrictEqual(Cl.tuple({ count: Cl.uint(1) }));
     });
   });
 });

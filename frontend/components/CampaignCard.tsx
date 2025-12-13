@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Clock, Users, ArrowUpRight } from "lucide-react";
@@ -91,7 +91,7 @@ const CampaignCard = ({
         </div>
 
         {/* CTA */}
-        <Link to={`/campaign/${id}`}>
+        <Link href={`/campaign/${id}`}>
           <Button variant="outline" className="w-full group/btn">
             <span>Back this project</span>
             <ArrowUpRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5" />

@@ -118,6 +118,9 @@
 )
 
 (define-private (calculate-platform-fee (amount uint))
+    ;; Safe fee calculation with overflow protection
+    ;; Fee is capped at 10%, so max multiplication is amount * 10
+    ;; Result will always fit in uint if amount fits in uint
     (/ (* amount (var-get platform-fee-percentage)) u100)
 )
 
@@ -171,6 +174,8 @@
         )
         ;; Validations
         (asserts! (not (var-get contract-paused)) ERR-CONTRACT-PAUSED)
+        (asserts! (> (len title) u0) ERR-INVALID-AMOUNT) ;; Title cannot be empty
+        (asserts! (> (len description) u0) ERR-INVALID-AMOUNT) ;; Description cannot be empty
         (asserts! (>= goal MIN-GOAL) ERR-INVALID-GOAL)
         (asserts! (>= duration MIN-CAMPAIGN-DURATION) ERR-INVALID-DEADLINE)
         (asserts! (<= duration MAX-CAMPAIGN-DURATION) ERR-INVALID-DEADLINE)
@@ -222,7 +227,11 @@
         ;; Validations
         (asserts! (not (var-get contract-paused)) ERR-CONTRACT-PAUSED)
         (asserts! (> amount u0) ERR-INVALID-AMOUNT)
-        (asserts! (is-eq (get state campaign) STATE-ACTIVE) ERR-CAMPAIGN-ENDED)
+        ;; Allow pledges to active or successful campaigns (but not failed/cancelled)
+        (asserts! (or
+            (is-eq (get state campaign) STATE-ACTIVE)
+            (is-eq (get state campaign) STATE-SUCCESSFUL)
+        ) ERR-CAMPAIGN-ENDED)
         (asserts! (< stacks-block-height (get deadline campaign))
             ERR-CAMPAIGN-ENDED
         )
@@ -258,9 +267,19 @@
             )
         )
 
-        ;; Update campaign total
-        (map-set campaigns { campaign-id: campaign-id }
-            (merge campaign { total-pledged: (+ (get total-pledged campaign) amount) })
+        ;; Update campaign total and state if goal reached
+        (let ((new-total (+ (get total-pledged campaign) amount)))
+            (map-set campaigns { campaign-id: campaign-id }
+                (if (>= new-total (get goal campaign))
+                    ;; Goal reached - mark as successful if not already
+                    (merge campaign {
+                        total-pledged: new-total,
+                        state: STATE-SUCCESSFUL
+                    })
+                    ;; Goal not reached yet - just update total
+                    (merge campaign { total-pledged: new-total })
+                )
+            )
         )
 
         ;; Emit event

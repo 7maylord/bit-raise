@@ -1,11 +1,16 @@
+"use client";
+
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Wallet, Zap } from "lucide-react";
+import { Menu, X, Wallet, Zap, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useStacksContext } from "@/contexts/StacksContext";
+import { abbreviateAddress } from "@/lib/stx-utils";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const { userData, connectWallet, disconnectWallet, getAddress } = useStacksContext();
 
   const navLinks = [
     { name: "Explore", href: "#explore" },
@@ -13,6 +18,8 @@ const Navbar = () => {
     { name: "Create Campaign", href: "/create", isRoute: true },
     { name: "About", href: "#about" },
   ];
+
+  const address = getAddress();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass-strong">
@@ -34,7 +41,7 @@ const Navbar = () => {
               link.isRoute ? (
                 <Link
                   key={link.name}
-                  to={link.href}
+                  href={link.href}
                   className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm font-medium"
                 >
                   {link.name}
@@ -54,10 +61,27 @@ const Navbar = () => {
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
-            <Button variant="glass" size="default">
-              <Wallet className="w-4 h-4" />
-              Connect Wallet
-            </Button>
+            {userData && address ? (
+              <div className="flex items-center gap-2">
+                <Button variant="glass" size="default" disabled>
+                  <Wallet className="w-4 h-4" />
+                  {abbreviateAddress(address)}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={disconnectWallet}
+                  title="Disconnect wallet"
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button variant="glass" size="default" onClick={connectWallet}>
+                <Wallet className="w-4 h-4" />
+                Connect Wallet
+              </Button>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -77,7 +101,7 @@ const Navbar = () => {
                 link.isRoute ? (
                   <Link
                     key={link.name}
-                    to={link.href}
+                    href={link.href}
                     className="text-muted-foreground hover:text-foreground transition-colors duration-200 py-2"
                     onClick={() => setIsOpen(false)}
                   >
@@ -96,10 +120,27 @@ const Navbar = () => {
               )}
               <div className="flex items-center gap-3 mt-2">
                 <ThemeToggle />
-                <Button variant="glass" className="flex-1">
-                  <Wallet className="w-4 h-4" />
-                  Connect Wallet
-                </Button>
+                {userData && address ? (
+                  <>
+                    <Button variant="glass" className="flex-1" disabled>
+                      <Wallet className="w-4 h-4" />
+                      {abbreviateAddress(address)}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={disconnectWallet}
+                      title="Disconnect wallet"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="glass" className="flex-1" onClick={connectWallet}>
+                    <Wallet className="w-4 h-4" />
+                    Connect Wallet
+                  </Button>
+                )}
               </div>
             </div>
           </div>

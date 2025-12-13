@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, Shield, Zap, Bitcoin } from "lucide-react";
 import heroBg from "@/assets/hero-bg.jpg";
@@ -48,7 +48,7 @@ const HeroSection = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <Link to="/create">
+            <Link href="/create">
               <Button variant="hero" size="xl">
                 Start a Campaign
                 <ArrowRight className="w-5 h-5" />

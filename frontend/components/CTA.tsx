@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Rocket, Sparkles } from "lucide-react";
 
@@ -34,7 +34,7 @@ const CTA = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link to="/create">
+            <Link href="/create">
               <Button variant="hero" size="xl" className="min-w-[200px]">
                 <Rocket className="w-5 h-5" />
                 Start Your Campaign
