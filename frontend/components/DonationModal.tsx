@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Wallet, Zap, Heart, Gift } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useStacksContext } from "@/contexts/StacksContext";
+import { useStacks } from "@/hooks/use-stacks";
 import { toast as sonnerToast } from "sonner";
 
 interface DonationModalProps {
@@ -29,7 +29,7 @@ const DonationModal = ({ isOpen, onClose, campaignTitle, campaignId }: DonationM
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
   const [isPledging, setIsPledging] = useState(false);
   const { toast } = useToast();
-  const { userData, pledge } = useStacksContext();
+  const { userData, pledge } = useStacks();
 
   const handlePresetClick = (preset: number) => {
     setSelectedPreset(preset);
@@ -86,7 +86,7 @@ const DonationModal = ({ isOpen, onClose, campaignTitle, campaignId }: DonationM
             Back this Project
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Support "{campaignTitle}" with STX
+            Support &quot;{campaignTitle}&quot; with STX
           </DialogDescription>
         </DialogHeader>
 

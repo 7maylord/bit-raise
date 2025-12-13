@@ -14,11 +14,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, ArrowRight, Check, Rocket } from "lucide-react";
+import { ArrowLeft, ArrowRight, Rocket } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { toast } from "sonner";
-import { useStacksContext } from "@/contexts/StacksContext";
+import { useStacks } from "@/hooks/use-stacks";
 import { daysToBlocks } from "@/lib/stx-utils";
 
 const CATEGORIES = [
@@ -60,7 +59,7 @@ const steps = [
 
 export default function CreateCampaignPage() {
   const router = useRouter();
-  const { userData, createCampaign } = useStacksContext();
+  const { userData, createCampaign } = useStacks();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -268,9 +267,9 @@ export default function CreateCampaignPage() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-y-auto">
       <Navbar />
-      <div className="container mx-auto px-4 py-12 max-w-3xl">
+      <div className="container mx-auto px-4 pt-24 md:pt-28 pb-12 max-w-3xl">
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-4">Create Campaign</h1>
           <Progress value={progress} className="h-2" />
@@ -321,7 +320,6 @@ export default function CreateCampaignPage() {
           )}
         </div>
       </div>
-      <Footer />
     </div>
   );
 }

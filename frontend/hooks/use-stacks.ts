@@ -1,6 +1,4 @@
-"use client";
-
-import { useState, useEffect, useCallback } from "react";
+import * as contract from "@/lib/contract";
 import {
   AppConfig,
   openContractCall,
@@ -10,44 +8,23 @@ import {
 } from "@stacks/connect";
 import { STACKS_TESTNET, STACKS_MAINNET } from "@stacks/network";
 import { PostConditionMode } from "@stacks/transactions";
-import * as contract from "@/lib/contract";
+import { useEffect, useState } from "react";
 
-type UserSessionType = InstanceType<typeof UserSession>;
-
-// App configuration
 const appDetails = {
   name: "BitRaise",
-  icon: typeof window !== "undefined" ? `${window.location.origin}/icon.png` : "",
+  icon: "https://cryptologos.cc/logos/stacks-stx-logo.png",
 };
 
-// Network configuration
+const appConfig = new AppConfig(["store_write"]);
+const userSession = new UserSession({ appConfig });
+
 const USE_TESTNET = true;
 const NETWORK = USE_TESTNET ? STACKS_TESTNET : STACKS_MAINNET;
 
 export function useStacks() {
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [userSession, setUserSession] = useState<UserSessionType | null>(null);
 
-  // Initialize user session
-  useEffect(() => {
-    const appConfig = new AppConfig(["store_write"]);
-    const session = new UserSession({ appConfig });
-    setUserSession(session);
-
-    // Handle pending sign-in
-    if (session.isSignInPending()) {
-      session.handlePendingSignIn().then((data) => {
-        setUserData(data);
-      });
-    } else if (session.isUserSignedIn()) {
-      setUserData(session.loadUserData());
-    }
-  }, []);
-
-  // Connect wallet
-  const connectWallet = useCallback(() => {
-    if (!userSession) return;
-
+  function connectWallet() {
     showConnect({
       appDetails,
       onFinish: () => {
@@ -55,37 +32,31 @@ export function useStacks() {
       },
       userSession,
     });
-  }, [userSession]);
+  }
 
-  // Disconnect wallet
-  const disconnectWallet = useCallback(() => {
-    if (!userSession) return;
-
+  function disconnectWallet() {
     userSession.signUserOut();
     setUserData(null);
-  }, [userSession]);
+  }
 
-  // Get user's STX address
-  const getAddress = useCallback((): string | null => {
+  function getAddress(): string | null {
     if (!userData) return null;
     return USE_TESTNET
       ? userData.profile.stxAddress.testnet
       : userData.profile.stxAddress.mainnet;
-  }, [userData]);
+  }
 
-  // Create campaign
-  const createCampaign = useCallback(
-    async (
-      title: string,
-      description: string,
-      goalInStx: number,
-      durationInBlocks: number,
-      metadataUri: string
-    ) => {
-      if (!userData) {
-        throw new Error("Please connect your wallet first");
-      }
+  async function createCampaign(
+    title: string,
+    description: string,
+    goalInStx: number,
+    durationInBlocks: number,
+    metadataUri: string
+  ) {
+    if (typeof window === "undefined") return;
 
+    try {
+      if (!userData) throw new Error("Please connect your wallet first");
       const txOptions = await contract.createCampaign(
         title,
         description,
@@ -93,132 +64,126 @@ export function useStacks() {
         durationInBlocks,
         metadataUri
       );
-
-      return new Promise((resolve, reject) => {
-        openContractCall({
-          ...txOptions,
-          appDetails,
-          postConditionMode: PostConditionMode.Allow,
-          onFinish: (data) => {
-            console.log("Campaign created:", data);
-            resolve(data);
-          },
-          onCancel: () => {
-            reject(new Error("Transaction cancelled"));
-          },
-        });
+      await openContractCall({
+        ...txOptions,
+        appDetails,
+        onFinish: (data) => {
+          console.log(data);
+          window.alert("Campaign created successfully!");
+        },
+        postConditionMode: PostConditionMode.Allow,
       });
-    },
-    [userData]
-  );
+    } catch (_err) {
+      const err = _err as Error;
+      console.error(err);
+      window.alert(err.message);
+    }
+  }
 
-  // Pledge to campaign
-  const pledge = useCallback(
-    async (campaignId: number, amountInStx: number) => {
-      if (!userData) {
-        throw new Error("Please connect your wallet first");
-      }
+  async function pledge(campaignId: number, amountInStx: number) {
+    if (typeof window === "undefined") return;
 
+    try {
+      if (!userData) throw new Error("Please connect your wallet first");
       const txOptions = await contract.pledgeToCampaign(campaignId, amountInStx);
-
-      return new Promise((resolve, reject) => {
-        openContractCall({
-          ...txOptions,
-          appDetails,
-          postConditionMode: PostConditionMode.Allow,
-          onFinish: (data) => {
-            console.log("Pledge successful:", data);
-            resolve(data);
-          },
-          onCancel: () => {
-            reject(new Error("Transaction cancelled"));
-          },
-        });
+      await openContractCall({
+        ...txOptions,
+        appDetails,
+        onFinish: (data) => {
+          console.log(data);
+          window.alert("Pledge submitted successfully!");
+        },
+        postConditionMode: PostConditionMode.Allow,
       });
-    },
-    [userData]
-  );
+    } catch (_err) {
+      const err = _err as Error;
+      console.error(err);
+      window.alert(err.message);
+    }
+  }
 
-  // Withdraw funds
-  const withdrawFunds = useCallback(
-    async (campaignId: number) => {
-      if (!userData) {
-        throw new Error("Please connect your wallet first");
-      }
+  async function withdrawFunds(campaignId: number) {
+    if (typeof window === "undefined") return;
 
+    try {
+      if (!userData) throw new Error("Please connect your wallet first");
       const txOptions = await contract.withdrawFunds(campaignId);
-
-      return new Promise((resolve, reject) => {
-        openContractCall({
-          ...txOptions,
-          appDetails,
-          postConditionMode: PostConditionMode.Deny, // Safer for withdrawals
-          onFinish: (data) => {
-            console.log("Withdrawal successful:", data);
-            resolve(data);
-          },
-          onCancel: () => {
-            reject(new Error("Transaction cancelled"));
-          },
-        });
+      await openContractCall({
+        ...txOptions,
+        appDetails,
+        onFinish: (data) => {
+          console.log(data);
+          window.alert("Withdrawal submitted successfully!");
+        },
+        postConditionMode: PostConditionMode.Allow,
       });
-    },
-    [userData]
-  );
+    } catch (_err) {
+      const err = _err as Error;
+      console.error(err);
+      window.alert(err.message);
+    }
+  }
 
-  // Request refund
-  const requestRefund = useCallback(
-    async (campaignId: number) => {
-      if (!userData) {
-        throw new Error("Please connect your wallet first");
-      }
+  async function requestRefund(campaignId: number) {
+    if (typeof window === "undefined") return;
 
+    try {
+      if (!userData) throw new Error("Please connect your wallet first");
       const txOptions = await contract.requestRefund(campaignId);
-
-      return new Promise((resolve, reject) => {
-        openContractCall({
-          ...txOptions,
-          appDetails,
-          postConditionMode: PostConditionMode.Deny, // Safer for refunds
-          onFinish: (data) => {
-            console.log("Refund successful:", data);
-            resolve(data);
-          },
-          onCancel: () => {
-            reject(new Error("Transaction cancelled"));
-          },
-        });
+      await openContractCall({
+        ...txOptions,
+        appDetails,
+        onFinish: (data) => {
+          console.log(data);
+          window.alert("Refund requested successfully!");
+        },
+        postConditionMode: PostConditionMode.Allow,
       });
-    },
-    [userData]
-  );
+    } catch (_err) {
+      const err = _err as Error;
+      console.error(err);
+      window.alert(err.message);
+    }
+  }
 
-  // Cancel campaign
-  const cancelCampaign = useCallback(
-    async (campaignId: number) => {
-      if (!userData) {
-        throw new Error("Please connect your wallet first");
-      }
+  async function cancelCampaign(campaignId: number) {
+    if (typeof window === "undefined") return;
 
+    try {
+      if (!userData) throw new Error("Please connect your wallet first");
       const txOptions = await contract.cancelCampaign(campaignId);
-
-      return new Promise((resolve, reject) => {
-        openContractCall({
-          ...txOptions,
-          appDetails,
-          postConditionMode: PostConditionMode.Allow,
-          onFinish: (data) => {
-            console.log("Campaign cancelled:", data);
-            resolve(data);
-          },
-          onCancel: () => {
-            reject(new Error("Transaction cancelled"));
-          },
-        });
+      await openContractCall({
+        ...txOptions,
+        appDetails,
+        onFinish: (data) => {
+          console.log(data);
+          window.alert("Campaign cancelled successfully!");
+        },
+        postConditionMode: PostConditionMode.Allow,
       });
-    },
-    [userData]
-  );
+    } catch (_err) {
+      const err = _err as Error;
+      console.error(err);
+      window.alert(err.message);
+    }
+  }
+
+  useEffect(() => {
+    try {
+      if (userSession.isSignInPending()) {
+        userSession.handlePendingSignIn().then((userData) => {
+          setUserData(userData);
+        });
+      } else if (userSession.isUserSignedIn()) {
+        setUserData(userSession.loadUserData());
+      }
+    } catch (error) {
+      console.error("Error loading user session:", error);
+      // Clear corrupted session data
+      userSession.signUserOut();
+      setUserData(null);
+    }
+  }, []);
 
   return {
     userData,

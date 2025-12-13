@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Zap, Github, Twitter, MessageCircle, ExternalLink } from "lucide-react";
 
 const Footer = () => {
@@ -39,14 +40,14 @@ const Footer = () => {
         <div className="grid grid-cols-2 md:grid-cols-6 gap-8 mb-12">
           {/* Logo & Description */}
           <div className="col-span-2">
-            <a href="/" className="flex items-center gap-2 mb-4">
+            <Link href="/" className="flex items-center gap-2 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center">
                 <Zap className="w-5 h-5 text-primary-foreground" />
               </div>
               <span className="text-xl font-bold">
                 Bit<span className="text-gradient">Raise</span>
               </span>
-            </a>
+            </Link>
             <p className="text-muted-foreground text-sm mb-6 max-w-xs">
               The decentralized crowdfunding platform powered by Bitcoin. 
               Secure, transparent, and borderless.

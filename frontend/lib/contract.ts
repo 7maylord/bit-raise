@@ -7,7 +7,6 @@ import {
   principalCV,
   cvToValue,
   fetchCallReadOnlyFunction,
-  ClarityValue,
 } from "@stacks/transactions";
 import { StacksNetwork } from "@stacks/network";
 

@@ -23,12 +23,12 @@ const CTA = () => {
           {/* Heading */}
           <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-6">
             Your Next Big Idea Deserves{" "}
-            <span className="text-gradient">Bitcoin's Backing</span>
+            <span className="text-gradient">Bitcoin&apos;s Backing</span>
           </h2>
 
           {/* Description */}
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
-            Join thousands of innovators who've chosen the most secure way to fund their dreams. 
+            Join thousands of innovators who&apos;ve chosen the most secure way to fund their dreams.
             Create your campaign in minutes and tap into the Bitcoin community.
           </p>
 

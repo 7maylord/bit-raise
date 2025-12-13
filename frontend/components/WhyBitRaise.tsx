@@ -47,8 +47,8 @@ const WhyBitRaise = () => {
             <span className="text-gradient">Crowdfunding</span>
           </h2>
           <p className="text-muted-foreground">
-            Traditional crowdfunding is broken. High fees, payment failures, and geographic restrictions 
-            leave billions of dollars and ideas on the table. We're fixing that.
+            Traditional crowdfunding is broken. High fees, payment failures, and geographic restrictions
+            leave billions of dollars and ideas on the table. We&apos;re fixing that.
           </p>
         </div>
 
