@@ -418,3 +418,59 @@ export async function isContractPaused(
     return false;
   }
 }
+
+/**
+ * Get current Stacks block height
+ */
+export async function getCurrentBlockHeight(
+  network: StacksNetwork
+): Promise<number> {
+  try {
+    // @ts-expect-error - coreApiUrl exists on network but type definition may be incomplete
+    const apiUrl = network.coreApiUrl || "https://api.testnet.hiro.so";
+    const response = await fetch(`${apiUrl}/extended/v1/block?limit=1`);
+    const data = await response.json();
+    return data.results[0]?.height || 0;
+  } catch (error) {
+    console.error("Error fetching current block height:", error);
+    return 0;
+  }
+}
+
+/**
+ * Get all campaigns
+ * Fetches campaigns from ID 0 to current nonce
+ */
+export async function getAllCampaigns(
+  network: StacksNetwork
+): Promise<(Campaign & { id: number })[]> {
+  try {
+    const nonce = await getCampaignNonce(network);
+
+    if (nonce === 0) {
+      return [];
+    }
+
+    const campaigns: (Campaign & { id: number })[] = [];
+
+    // Fetch all campaigns in parallel
+    const campaignPromises = [];
+    for (let i = 0; i < nonce; i++) {
+      campaignPromises.push(getCampaign(i, network));
+    }
+
+    const results = await Promise.all(campaignPromises);
+
+    // Filter out null results and add campaign IDs
+    results.forEach((campaign, index) => {
+      if (campaign) {
+        campaigns.push({ ...campaign, id: index });
+      }
+    });
+
+    return campaigns;
+  } catch (error) {
+    console.error("Error fetching all campaigns:", error);
+    return [];
+  }
+}

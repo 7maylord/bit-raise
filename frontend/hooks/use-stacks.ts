@@ -9,6 +9,7 @@ import {
 import { STACKS_TESTNET, STACKS_MAINNET } from "@stacks/network";
 import { PostConditionMode } from "@stacks/transactions";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 const appDetails = {
   name: "BitRaise",
@@ -69,14 +70,14 @@ export function useStacks() {
         appDetails,
         onFinish: (data) => {
           console.log(data);
-          window.alert("Campaign created successfully!");
+          toast.success("Campaign created successfully!");
         },
         postConditionMode: PostConditionMode.Allow,
       });
     } catch (_err) {
       const err = _err as Error;
       console.error(err);
-      window.alert(err.message);
+      toast.error(err.message);
     }
   }
 
@@ -91,14 +92,14 @@ export function useStacks() {
         appDetails,
         onFinish: (data) => {
           console.log(data);
-          window.alert("Pledge submitted successfully!");
+          toast.success("Pledge submitted successfully!");
         },
         postConditionMode: PostConditionMode.Allow,
       });
     } catch (_err) {
       const err = _err as Error;
       console.error(err);
-      window.alert(err.message);
+      toast.error(err.message);
     }
   }
 
@@ -113,14 +114,14 @@ export function useStacks() {
         appDetails,
         onFinish: (data) => {
           console.log(data);
-          window.alert("Withdrawal submitted successfully!");
+          toast.success("Withdrawal submitted successfully!");
         },
         postConditionMode: PostConditionMode.Allow,
       });
     } catch (_err) {
       const err = _err as Error;
       console.error(err);
-      window.alert(err.message);
+      toast.error(err.message);
     }
   }
 
@@ -135,14 +136,14 @@ export function useStacks() {
         appDetails,
         onFinish: (data) => {
           console.log(data);
-          window.alert("Refund requested successfully!");
+          toast.success("Refund requested successfully!");
         },
         postConditionMode: PostConditionMode.Allow,
       });
     } catch (_err) {
       const err = _err as Error;
       console.error(err);
-      window.alert(err.message);
+      toast.error(err.message);
     }
   }
 
@@ -157,14 +158,14 @@ export function useStacks() {
         appDetails,
         onFinish: (data) => {
           console.log(data);
-          window.alert("Campaign cancelled successfully!");
+          toast.success("Campaign cancelled successfully!");
         },
         postConditionMode: PostConditionMode.Allow,
       });
     } catch (_err) {
       const err = _err as Error;
       console.error(err);
-      window.alert(err.message);
+      toast.error(err.message);
     }
   }
 
