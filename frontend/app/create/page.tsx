@@ -19,6 +19,7 @@ import Navbar from "@/components/Navbar";
 import { toast } from "sonner";
 import { useStacks } from "@/hooks/use-stacks";
 import { daysToBlocks } from "@/lib/stx-utils";
+import { uploadCampaignMetadata } from "@/lib/ipfs";
 
 const CATEGORIES = [
   "DeFi",
@@ -112,8 +113,23 @@ export default function CreateCampaignPage() {
 
     try {
       const durationInBlocks = daysToBlocks(Number(formData.duration));
-      const metadataUri = `ipfs://${formData.category.toLowerCase()}-${Date.now()}`;
 
+      // Upload metadata to IPFS
+      toast.loading("Uploading campaign metadata to IPFS...");
+      const metadataUri = await uploadCampaignMetadata({
+        title: formData.title,
+        description: formData.description,
+        fullDescription: formData.fullDescription,
+        category: formData.category,
+        goal: Number(formData.goal),
+        duration: Number(formData.duration),
+        createdAt: Date.now(),
+      });
+
+      toast.dismiss();
+      toast.success("Metadata uploaded to IPFS!");
+
+      // Create campaign with IPFS URI
       await createCampaign(
         formData.title,
         formData.description,
@@ -130,6 +146,7 @@ export default function CreateCampaignPage() {
       }, 2000);
     } catch (error) {
       console.error("Error creating campaign:", error);
+      toast.dismiss();
       toast.error(error instanceof Error ? error.message : "Failed to create campaign");
     } finally {
       setIsSubmitting(false);

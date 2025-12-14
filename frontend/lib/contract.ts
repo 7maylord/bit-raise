@@ -12,7 +12,7 @@ import { StacksNetwork } from "@stacks/network";
 
 // Contract configuration
 
-export const CONTRACT_ADDRESS = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM"; // Placeholder - update after deployment
+export const CONTRACT_ADDRESS = "ST2475KYHCQ0PSMFZBVJRRZ47J0QEP8P9M8A2FBV9"; 
 export const CONTRACT_NAME = "bitraise";
 
 // Campaign state constants (matching smart contract)
